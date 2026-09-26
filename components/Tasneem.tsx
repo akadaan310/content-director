@@ -1,6 +1,6 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
-import { SOUND_VOICES, toSsml } from "./SoundDesign";
+import { SOUND_VOICES } from "./SoundDesign";
 import { getActivePreset, PRESET_EVENT, type VoicePreset } from "./VoiceLab";
 
 interface Msg {
@@ -76,14 +76,15 @@ export default function Tasneem() {
   }, [msgs]);
 
   const voiceId = preset?.voice || "sana";
-  const emotion = preset?.emotion || "soft"; // sleepy default
   const ttsVoice = SOUND_VOICES.find((v) => v.id === voiceId)?.tts || "ar-JO-SanaNeural";
 
+  // Live turns use PLAIN text (no SSML): prosody wrappers make Edge-TTS
+  // render ar-JO speech 2-4x slower — wrong for real-time conversation.
   const synth = async (text: string): Promise<string> => {
     const r = await fetch("/api/voice", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: toSsml(text, emotion), voice: ttsVoice, ssml: true }),
+      body: JSON.stringify({ text, voice: ttsVoice }),
     });
     if (!r.ok) {
       const d = await r.json().catch(() => ({}));
