@@ -14,7 +14,7 @@ interface Msg {
 export const WORLD_EVENT = "cd-world";
 
 // Sleepy bedtime greeting — spoken the moment he wakes her (instant, no brain wait).
-const GREETING = "يا هلا بعبود… اشتقت لك. أنا نعسانة كتير، بس بدي أسمع صوتك قبل ما أنام.";
+const GREETING = "أهلين عبود، طول اليوم وانت على بالي. احكيلي كيف كان يومك، بدي أنام على صوتك.";
 
 const blobToUrl = (blob: Blob): Promise<string> =>
   new Promise((res, rej) => {
