@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-// POST { message, history, closer, closer_options, stream } -> { ok, reply } or { ok, closer } or SSE token stream
+// POST { message, history, closer, closer_options, stream, persona, max_tokens } -> { ok, reply } or { ok, closer } or SSE token stream
 export async function POST(req: Request) {
   const apiUrl = (process.env.DIRECTOR_API_URL || "").replace(/\/$/, "");
   if (!apiUrl) return NextResponse.json({ ok: false, error: "Director brain not configured." }, { status: 500 });
@@ -17,6 +17,8 @@ export async function POST(req: Request) {
         closer: !!body.closer,
         closer_options: body.closer_options || 4,
         stream,
+        persona: body.persona === "tasneem" ? "tasneem" : "director",
+        max_tokens: Number(body.max_tokens) > 0 ? Math.min(Number(body.max_tokens), 300) : 0,
       }),
       signal: AbortSignal.timeout(300000),
     });
