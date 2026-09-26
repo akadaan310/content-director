@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 
+// The VM brain can take 60-120s to first token; give Vercel room to stream it.
+export const maxDuration = 300;
+
 // POST { message, history, closer, closer_options, stream, persona, max_tokens } -> { ok, reply } or { ok, closer } or SSE token stream
 export async function POST(req: Request) {
   const apiUrl = (process.env.DIRECTOR_API_URL || "").replace(/\/$/, "");

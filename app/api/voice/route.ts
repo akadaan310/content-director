@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 
+// TTS synthesis can take a while on the VM; give Vercel room.
+export const maxDuration = 180;
+
 // POST { text, voice, ssml, emotion } -> audio/mpeg (proxied through the VM's Edge-TTS)
 export async function POST(req: Request) {
   const apiUrl = (process.env.DIRECTOR_API_URL || "").replace(/\/$/, "");
