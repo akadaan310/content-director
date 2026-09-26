@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 // Persists to the portal backend -> /data/director-uploads.
 export async function POST(req: Request) {
   const apiUrl = (process.env.DIRECTOR_API_URL || "").replace(/\/$/, "");
-  if (!apiUrl) return NextResponse.json({ ok: false, error: "Director backend not configured." }, { status: 500 });
+  if (!apiUrl) return NextResponse.json({ ok: false, error: "Director backend not configured. Set DIRECTOR_API_URL in your deployment environment, then redeploy." }, { status: 500 });
   const { image, name } = await req.json().catch(() => ({}));
   if (!image) return NextResponse.json({ ok: false, error: "Image is required." }, { status: 400 });
   try {

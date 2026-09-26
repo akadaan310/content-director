@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 // served at {DIRECTOR_API_URL}/uploads/...
 export async function GET() {
   const apiUrl = (process.env.DIRECTOR_API_URL || "").replace(/\/$/, "");
-  if (!apiUrl) return NextResponse.json({ ok: false, error: "Director backend not configured." }, { status: 500 });
+  if (!apiUrl) return NextResponse.json({ ok: false, error: "Director backend not configured. Set DIRECTOR_API_URL in your deployment environment, then redeploy." }, { status: 500 });
   try {
     const r = await fetch(`${apiUrl}/api/director/gallery`, { signal: AbortSignal.timeout(30000) });
     const d = await r.json();

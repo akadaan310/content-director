@@ -48,6 +48,35 @@ const fileToDataUrl = (f: File): Promise<string> =>
     fr.readAsDataURL(f);
   });
 
+// Serverless request bodies cap out (Vercel ~4.5MB) — a raw phone photo as
+// base64 blows past that. Downscale anything bigger than 1920px to JPEG 0.85
+// on-device so uploads stay small and fast. GIFs pass through untouched.
+async function resizeForUpload(f: File): Promise<{ dataUrl: string; name: string }> {
+  if (f.type === "image/gif") return { dataUrl: await fileToDataUrl(f), name: f.name };
+  const url = URL.createObjectURL(f);
+  try {
+    const img = await new Promise<HTMLImageElement>((res, rej) => {
+      const i = new Image();
+      i.onload = () => res(i);
+      i.onerror = () => rej(new Error("could not read image"));
+      i.src = url;
+    });
+    const MAX = 1920;
+    let w = img.width || 1, h = img.height || 1;
+    if (Math.max(w, h) > MAX) {
+      const s = MAX / Math.max(w, h);
+      w = Math.max(1, Math.round(w * s));
+      h = Math.max(1, Math.round(h * s));
+    }
+    const c = document.createElement("canvas");
+    c.width = w; c.height = h;
+    c.getContext("2d")!.drawImage(img, 0, 0, w, h);
+    return { dataUrl: c.toDataURL("image/jpeg", 0.85), name: f.name.replace(/\.[^.]+$/, "") + ".jpg" };
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 async function vision(image: string, prompt: string): Promise<string> {
   const r = await fetch("/api/vision", {
     method: "POST",
@@ -86,11 +115,11 @@ export default function HerGallery() {
     setNote("");
     for (const f of Array.from(files).slice(0, 8)) {
       try {
-        const dataUrl = await fileToDataUrl(f);
+        const { dataUrl, name } = await resizeForUpload(f);
         const r = await fetch("/api/gallery/upload", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ image: dataUrl, name: f.name }),
+          body: JSON.stringify({ image: dataUrl, name }),
         });
         const d = await r.json();
         if (!d.ok) throw new Error(d.error || "upload failed");
