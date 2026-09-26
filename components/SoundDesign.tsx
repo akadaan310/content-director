@@ -14,7 +14,7 @@ export const SOUND_VOICES = [
 export const EMOTIONS = ["whisper", "soft", "warm", "intense", "playful", "solemn"] as const;
 
 // Emotion direction -> SSML prosody (Edge-TTS Arabic voices honor prosody tags)
-const EMOTION_SSML: Record<string, string> = {
+export const EMOTION_SSML: Record<string, string> = {
   whisper: 'volume="soft" rate="90%"',
   soft: 'pitch="-5%" rate="95%"',
   warm: 'pitch="+5%" rate="95%"',
@@ -24,7 +24,7 @@ const EMOTION_SSML: Record<string, string> = {
 };
 
 const escXml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-const toSsml = (text: string, emotion: string) =>
+export const toSsml = (text: string, emotion: string) =>
   `<speak><prosody ${EMOTION_SSML[emotion] || EMOTION_SSML.warm}>${escXml(text)}</prosody></speak>`;
 
 export interface VoiceLine { voice: string; text: string; emotion: string; direction: string }

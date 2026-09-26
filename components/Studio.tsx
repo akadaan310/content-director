@@ -2,7 +2,8 @@
 import { useState, useRef, useEffect } from "react";
 import Closer from "./Closer";
 import CostPicker from "./CostPicker";
-import SoundDesign from "./SoundDesign";
+import SoundDesign, { SOUND_VOICES } from "./SoundDesign";
+import VoiceLab, { getActivePreset, saveActivePreset, PRESET_EVENT, type VoicePreset } from "./VoiceLab";
 import Session from "./Session";
 import type { TierQuote, CostTier } from "@/lib/pricing";
 
@@ -26,6 +27,8 @@ export default function Studio({ onNewItem, items }: { onNewItem: (item: Gallery
   const [closerTopic, setCloserTopic] = useState("");
   const [showCloser, setShowCloser] = useState(false);
   const [showSound, setShowSound] = useState(false);
+  const [showLab, setShowLab] = useState(false);
+  const [activePreset, setActivePreset] = useState<VoicePreset | null>(null);
   const [deductions, setDeductions] = useState<string[]>([]);
   const [hintSeen, setHintSeen] = useState(true);
   const [prompt, setPrompt] = useState("");
@@ -42,8 +45,19 @@ export default function Studio({ onNewItem, items }: { onNewItem: (item: Gallery
 
   useEffect(() => {
     try { setHintSeen(!!localStorage.getItem("cd-sound-hint")); } catch {}
-    return () => { if (chatTimer.current) clearInterval(chatTimer.current); };
+    try { setActivePreset(getActivePreset()); } catch {}
+    const onPreset = () => { try { setActivePreset(getActivePreset()); } catch {} };
+    window.addEventListener(PRESET_EVENT, onPreset);
+    return () => { if (chatTimer.current) clearInterval(chatTimer.current); window.removeEventListener(PRESET_EVENT, onPreset); };
   }, []);
+
+  // When a voice preset is locked, make it the default voice for synthesis.
+  useEffect(() => {
+    if (activePreset) {
+      const tts = SOUND_VOICES.find((v) => v.id === activePreset.voice)?.tts;
+      if (tts) setVoice(tts);
+    }
+  }, [activePreset]);
 
   const dismissHint = () => {
     try { localStorage.setItem("cd-sound-hint", "1"); } catch {}
@@ -225,6 +239,9 @@ export default function Studio({ onNewItem, items }: { onNewItem: (item: Gallery
           <button className="btn-ghost px-4 py-2 text-sm mt-2 w-full" onClick={() => setShowSound((s) => !s)}>
             {showSound ? "Hide sound design" : "🎧 Design the sound — the director writes the audio"}
           </button>
+          <button className="btn-ghost px-4 py-2 text-sm mt-2 w-full" onClick={() => setShowLab((s) => !s)}>
+            {showLab ? "Hide voice lab" : "🧪 Voice Lab — design her voice from images"}
+          </button>
         </div>
         {showCloser && (
           <Closer topic={closerTopic} onDone={(deduction, trail) => {
@@ -270,6 +287,13 @@ export default function Studio({ onNewItem, items }: { onNewItem: (item: Gallery
             </>
           ) : (
             <>
+              {activePreset && (
+                <div className="flex items-center justify-between p-2.5 rounded-lg border border-[rgba(212,175,55,0.4)] bg-[rgba(212,175,55,0.07)] mb-2 text-sm">
+                  <span>🎙 Voice: <span className="gold-text font-medium">{activePreset.name}</span>
+                    <span className="opacity-60"> · {activePreset.emotion}</span></span>
+                  <button className="btn-ghost px-2 py-1 text-xs" onClick={() => saveActivePreset(null)} title="Clear preset">✕</button>
+                </div>
+              )}
               <p className="text-xs opacity-60 mb-2">Manual line entry <span className="opacity-70">(advanced)</span> — or open <span className="gold-text">🎧 Design the sound</span> and let the director write the lines for you.</p>
               <textarea className="w-full px-3 py-2 text-sm mb-2" rows={3} placeholder="The line — Arabic or English…" value={voiceText} onChange={(e) => setVoiceText(e.target.value)} />
               <select className="w-full px-3 py-2 text-sm mb-3" value={voice} onChange={(e) => setVoice(e.target.value)}>
@@ -285,6 +309,8 @@ export default function Studio({ onNewItem, items }: { onNewItem: (item: Gallery
         </div>
       </div>
     </div>
+
+    {showLab && <VoiceLab />}
 
     {showSound && (
       <SoundDesign
