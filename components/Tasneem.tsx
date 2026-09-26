@@ -84,7 +84,7 @@ export default function Tasneem() {
     };
     const onRefs = (e: Event) => {
       const r = (e as CustomEvent<HerRef[]>).detail;
-      if (Array.isArray(r)) setRefs(r.slice(0, 4));
+      if (Array.isArray(r)) setRefs(r); // no cap — every photo she chose counts
     };
     window.addEventListener(PRESET_EVENT, onPreset);
     window.addEventListener(VOICEDOCK_EVENT, onDock);
@@ -174,10 +174,12 @@ export default function Tasneem() {
         ? `[What you know about her world right now: ${world.join(" | ").slice(0, 600)}]\n\n`
         : "") +
       (refs.length > 0
-        ? `[Her look for visual continuity, from reference photos: ${refs
-            .map((r) => r.analysis)
+        ? `[Her look for visual continuity, from ${refs.length} reference photo${
+            refs.length > 1 ? "s" : ""
+          } (every one she chose is represented): ${refs
+            .map((r, i) => `#${i + 1} ${r.analysis.slice(0, 300)}`)
             .join(" | ")
-            .slice(0, 800)}]\n\n`
+            .slice(0, 2000)}]\n\n`
         : "");
 
     const audioQueue: Promise<string>[] = [];

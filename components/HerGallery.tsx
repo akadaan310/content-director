@@ -107,8 +107,7 @@ export default function HerGallery() {
     setSelected((p) => {
       const n = new Set(p);
       if (n.has(id)) n.delete(id);
-      else if (n.size < 4) n.add(id);
-      else setNote("Up to 4 reference photos — deselect one first.");
+      else n.add(id); // no cap — a session can hold any number of her photos
       return n;
     });
   };
@@ -139,11 +138,15 @@ export default function HerGallery() {
     setBusy("refs");
     setNote("");
     try {
-      const refs: HerRef[] = [];
-      for (const p of photos.filter((x) => selected.has(x.id))) {
-        const analysis = await vision(p.url, REF_PROMPT);
-        refs.push({ id: p.id, name: p.name, url: p.url, analysis: analysis.trim().slice(0, 900) });
-      }
+      const picked = photos.filter((x) => selected.has(x.id));
+      setNote(`👁 Reading her look across ${picked.length} photo${picked.length > 1 ? "s" : ""}…`);
+      // Batch: all vision passes run concurrently so N photos don't take N× time.
+      const refs: HerRef[] = await Promise.all(
+        picked.map(async (p) => {
+          const analysis = await vision(p.url, REF_PROMPT);
+          return { id: p.id, name: p.name, url: p.url, analysis: analysis.trim().slice(0, 900) };
+        })
+      );
       try {
         localStorage.setItem("cd-her-refs", JSON.stringify(refs));
       } catch {}
@@ -180,7 +183,8 @@ export default function HerGallery() {
       <p className="text-xs opacity-60 mb-3">
         Photos persist on your studio server. <span className="gold-text">Set as environment</span>{" "}
         reads the scene and drops her into it — <span className="gold-text">Use as her reference</span>{" "}
-        (up to 4) grounds her look for visual continuity across generated stills.
+        grounds her look for visual continuity across generated stills. Select as many as you like —
+        a whole session of her, if you want.
       </p>
 
       {selected.size > 0 && (
