@@ -1,17 +1,17 @@
 import { NextResponse } from "next/server";
 
-// POST { text, voice, ssml } -> audio/mpeg (proxied through the VM's Edge-TTS)
+// POST { text, voice, ssml, emotion } -> audio/mpeg (proxied through the VM's Edge-TTS)
 export async function POST(req: Request) {
   const apiUrl = (process.env.DIRECTOR_API_URL || "").replace(/\/$/, "");
   if (!apiUrl) return NextResponse.json({ ok: false, error: "Voice service not configured." }, { status: 500 });
-  const { text, voice = "ar-JO-SanaNeural", ssml = false } = await req.json();
+  const { text, voice = "ar-JO-SanaNeural", ssml = false, emotion = "neutral" } = await req.json();
   if (!text?.trim()) return NextResponse.json({ ok: false, error: "Text is required." }, { status: 400 });
 
   try {
     const r = await fetch(`${apiUrl}/api/director/tts`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: text.slice(0, 2000), voice, ssml }),
+      body: JSON.stringify({ text: text.slice(0, 2000), voice, ssml, emotion }),
       signal: AbortSignal.timeout(120000),
     });
     if (!r.ok) {

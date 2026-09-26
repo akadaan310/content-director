@@ -7,6 +7,9 @@ export const SOUND_VOICES = [
   { id: "taim", tts: "ar-JO-TaimNeural", label: "Taim — his voice (Jordanian Arabic)" },
   { id: "salma", tts: "ar-EG-SalmaNeural", label: "Salma — Egyptian Arabic (F)" },
   { id: "shakir", tts: "ar-EG-ShakirNeural", label: "Shakir — Egyptian Arabic (M)" },
+  { id: "amany", tts: "ar-SY-AmanyNeural", label: "Amany — Syrian Arabic (F)" },
+  { id: "layla", tts: "ar-LB-LaylaNeural", label: "Layla — Lebanese Arabic (F)" },
+  { id: "zariyah", tts: "ar-SA-ZariyahNeural", label: "Zariyah — Saudi Arabic (F)" },
   { id: "ava", tts: "en-US-AvaNeural", label: "Ava — English (F)" },
   { id: "andrew", tts: "en-US-AndrewNeural", label: "Andrew — English (M)" },
 ];

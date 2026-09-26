@@ -1,6 +1,9 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
 import { SOUND_VOICES } from "./SoundDesign";
+import VoiceDock, { getVoiceDock, saveVoiceDock, VOICEDOCK_EVENT, type VoiceDockState } from "./VoiceDock";
+import SfxRow from "./SfxRow";
+import { ENV_EVENT, REF_EVENT, type EnvCard, type HerRef } from "./HerGallery";
 import { getActivePreset, PRESET_EVENT, type VoicePreset } from "./VoiceLab";
 
 interface Msg {
@@ -36,11 +39,14 @@ export default function Tasneem() {
   const [busy, setBusy] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [speaking, setSpeaking] = useState(false);
-  const [muted, setMuted] = useState(false);
+  const [dock, setDock] = useState<VoiceDockState>({ voice: "sana", emotion: "warm", autoVoice: true });
   const [preset, setPreset] = useState<VoicePreset | null>(null);
   const [world, setWorld] = useState<string[]>([]);
+  const [envCard, setEnvCard] = useState<EnvCard | null>(null);
+  const [refs, setRefs] = useState<HerRef[]>([]);
   const [note, setNote] = useState("");
   const [listening, setListening] = useState(false);
+  const [playingMsg, setPlayingMsg] = useState<number | null>(null);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
   const recRef = useRef<{ stop: () => void } | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -48,10 +54,20 @@ export default function Tasneem() {
   useEffect(() => {
     try {
       setPreset(getActivePreset());
+      setDock(getVoiceDock());
+      const ec = localStorage.getItem("cd-env-card");
+      if (ec) setEnvCard(JSON.parse(ec));
+      const rc = localStorage.getItem("cd-her-refs");
+      if (rc) setRefs(JSON.parse(rc));
     } catch {}
     const onPreset = () => {
       try {
         setPreset(getActivePreset());
+      } catch {}
+    };
+    const onDock = () => {
+      try {
+        setDock(getVoiceDock());
       } catch {}
     };
     const onWorld = (e: Event) => {
@@ -62,12 +78,26 @@ export default function Tasneem() {
         setTimeout(() => setNote(""), 4000);
       }
     };
+    const onEnv = (e: Event) => {
+      const card = (e as CustomEvent<EnvCard>).detail;
+      if (card) setEnvCard(card);
+    };
+    const onRefs = (e: Event) => {
+      const r = (e as CustomEvent<HerRef[]>).detail;
+      if (Array.isArray(r)) setRefs(r.slice(0, 4));
+    };
     window.addEventListener(PRESET_EVENT, onPreset);
+    window.addEventListener(VOICEDOCK_EVENT, onDock);
     window.addEventListener(WORLD_EVENT, onWorld);
+    window.addEventListener(ENV_EVENT, onEnv);
+    window.addEventListener(REF_EVENT, onRefs);
     return () => {
       if (timer.current) clearInterval(timer.current);
       window.removeEventListener(PRESET_EVENT, onPreset);
+      window.removeEventListener(VOICEDOCK_EVENT, onDock);
       window.removeEventListener(WORLD_EVENT, onWorld);
+      window.removeEventListener(ENV_EVENT, onEnv);
+      window.removeEventListener(REF_EVENT, onRefs);
     };
   }, []);
 
@@ -75,16 +105,17 @@ export default function Tasneem() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [msgs]);
 
-  const voiceId = preset?.voice || "sana";
+  const voiceId = dock.voice || preset?.voice || "sana";
   const ttsVoice = SOUND_VOICES.find((v) => v.id === voiceId)?.tts || "ar-JO-SanaNeural";
+  const voiceLabel = SOUND_VOICES.find((v) => v.id === voiceId)?.label.split(" — ")[0] || voiceId;
 
-  // Live turns use PLAIN text (no SSML): prosody wrappers make Edge-TTS
-  // render ar-JO speech 2-4x slower — wrong for real-time conversation.
+  // Live turns: plain text + backend emotion (subtle prosody). Full client-side
+  // SSML wrappers are avoided — they stretch ar-JO speech 2-4x (measured).
   const synth = async (text: string): Promise<string> => {
     const r = await fetch("/api/voice", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text, voice: ttsVoice }),
+      body: JSON.stringify({ text, voice: ttsVoice, emotion: dock.emotion || "warm" }),
     });
     if (!r.ok) {
       const d = await r.json().catch(() => ({}));
@@ -95,11 +126,24 @@ export default function Tasneem() {
 
   const push = (m: Msg) => setMsgs((p) => [...p, m]);
 
+  const playMsg = async (i: number) => {
+    const m = msgs[i];
+    if (!m || m.role !== "her" || !m.text.trim() || playingMsg !== null) return;
+    setPlayingMsg(i);
+    try {
+      const url = await synth(m.text.trim().slice(0, 2000));
+      await playUrl(url);
+    } catch {
+      /* she still shows the words */
+    }
+    setPlayingMsg(null);
+  };
+
   const wake = async () => {
     if (awake) return;
     setAwake(true);
     push({ role: "her", text: GREETING });
-    if (!muted) {
+    if (dock.autoVoice) {
       setSpeaking(true);
       try {
         const url = await synth(GREETING);
@@ -126,9 +170,15 @@ export default function Tasneem() {
       content: m.text.slice(0, 300),
     }));
     const contextPrefix =
-      world.length > 0
+      (world.length > 0
         ? `[What you know about her world right now: ${world.join(" | ").slice(0, 600)}]\n\n`
-        : "";
+        : "") +
+      (refs.length > 0
+        ? `[Her look for visual continuity, from reference photos: ${refs
+            .map((r) => r.analysis)
+            .join(" | ")
+            .slice(0, 800)}]\n\n`
+        : "");
 
     const audioQueue: Promise<string>[] = [];
     let queuedLen = 0;
@@ -194,7 +244,7 @@ export default function Tasneem() {
               acc += d.token;
               gotToken = true;
               updateLast(acc);
-              if (!muted) queueSentences(acc);
+              if (dock.autoVoice) queueSentences(acc);
             } else if (d.error) throw new Error(d.error);
           } catch (e) {
             if (e instanceof Error && !/token|JSON/i.test(e.message)) throw e;
@@ -203,7 +253,7 @@ export default function Tasneem() {
       }
       if (!gotToken) {
         updateLast("…عيوني بتسكر، عبود. قولها مرة تانية؟");
-      } else if (!muted) {
+      } else if (dock.autoVoice) {
         // Speak: sentence-chunked — first sentence was already synthesizing while she kept talking.
         const tail = acc.slice(queuedLen).trim();
         if (tail.length > 2) audioQueue.push(synth(tail));
@@ -293,14 +343,41 @@ export default function Tasneem() {
             <span>she's thinking… {elapsed}s</span>
           ) : (
             <span>
-              live · {preset ? `voice: ${preset.name}` : "Jordanian Arabic · sleepy"} ·{" "}
-              <button className="underline underline-offset-4 opacity-70" onClick={() => setMuted((m) => !m)}>
-                {muted ? "unmute her" : "mute"}
+              live · {voiceLabel} · <span className="capitalize">{dock.emotion}</span> ·{" "}
+              <button
+                className="underline underline-offset-4 opacity-70"
+                onClick={() => saveVoiceDock({ ...dock, autoVoice: !dock.autoVoice })}
+              >
+                {dock.autoVoice ? "mute" : "unmute her"}
               </button>
             </span>
           )}
         </p>
       </div>
+
+      <VoiceDock />
+      <SfxRow />
+
+      {envCard && (
+        <div className="card p-3 flex gap-3 items-center">
+          <img
+            src={envCard.url}
+            alt="tonight's environment"
+            className="w-20 h-20 object-cover rounded-lg border border-[rgba(212,175,55,0.3)]"
+          />
+          <div className="min-w-0">
+            <div className="font-display text-lg gold-text leading-tight">{envCard.line}</div>
+            <div className="text-xs opacity-60 mt-1 line-clamp-2">{envCard.detail}</div>
+          </div>
+        </div>
+      )}
+
+      {refs.length > 0 && (
+        <div className="card p-3 text-xs">
+          ✨ <span className="gold-text font-medium">{refs.length} reference photo{refs.length > 1 ? "s" : ""}</span>
+          <span className="opacity-60"> grounding her look — {refs.map((r) => r.name).join(", ").slice(0, 70)}</span>
+        </div>
+      )}
 
       {awake && (
         <>
@@ -314,7 +391,18 @@ export default function Tasneem() {
                     : "bg-white/5 self-end"
                 }`}
               >
-                {m.role === "her" && <div className="text-xs gold-text mb-1">TASNEEM</div>}
+                {m.role === "her" && (
+                  <div className="text-xs gold-text mb-1 flex justify-between items-center">
+                    <span>TASNEEM</span>
+                    <button
+                      className="opacity-60 hover:opacity-100 px-1"
+                      onClick={() => playMsg(i)}
+                      title="Play this line in her voice"
+                    >
+                      {playingMsg === i ? "…" : "🔊"}
+                    </button>
+                  </div>
+                )}
                 <div className="whitespace-pre-wrap" dir="auto">
                   {m.text}
                 </div>

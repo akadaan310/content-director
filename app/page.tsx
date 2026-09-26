@@ -3,6 +3,7 @@ import { useState } from "react";
 import Tasneem from "@/components/Tasneem";
 import DirectorPanel from "@/components/DirectorPanel";
 import Gallery from "@/components/Gallery";
+import HerGallery from "@/components/HerGallery";
 import type { GalleryItem } from "@/components/Studio";
 
 type Tab = "tasneem" | "director" | "gallery";
@@ -47,8 +48,14 @@ export default function Home() {
         {tab === "tasneem" && <Tasneem />}
         {tab === "director" && <DirectorPanel onNewItem={addItem} />}
         {tab === "gallery" && (
-          <div className="max-w-2xl mx-auto w-full">
-            <Gallery items={items} onClear={() => setItems([])} />
+          <div className="max-w-2xl mx-auto w-full flex flex-col gap-8">
+            <HerGallery />
+            {items.length > 0 && (
+              <div>
+                <h2 className="font-display text-2xl gold-text mb-3">Creations</h2>
+                <Gallery items={items} onClear={() => setItems([])} />
+              </div>
+            )}
           </div>
         )}
 
